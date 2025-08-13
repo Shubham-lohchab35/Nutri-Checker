@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NutriChecker - nutrichecker.shubham</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+        }
+        h1 {
+            color: #2a7ae2;
+            text-align: center;
+        }
+        .watermark {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.5);
+            font-style: italic;
+            pointer-events: none;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #2a7ae2;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1a5bb8;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 5px;
+        }
+        .healthy {
+            color: green;
+            font-weight: bold;
+        }
+        .unhealthy {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">Shubham Lohchab</div>
+    <h1>NutriChecker</h1>
+    <div class="container">
+        <input type="text" id="foodInput" placeholder="Enter food name">
+        <select id="diseaseSelect">
+            <option value="general">General Health</option>
+            <option value="liver">Liver Disease</option>
+            <option value="diabetes">Sugar Disease (Diabetes)</option>
+        </select>
+        <button id="searchBtn">Search</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const APP_ID = "58b21cd6";
+        const APP_KEY = "19d61a8074f64b75148780fdeaaef55e";
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("searchBtn").addEventListener("click", () => {
+                const foodName = document.getElementById("foodInput").value.trim();
+                const disease = document.getElementById("diseaseSelect").value;
+                if (foodName) {
+                    searchFood(foodName, disease);
+                } else {
+                    alert("Please enter a food name.");
+                }
+            });
+        });
+
+        async function searchFood(food, disease) {
+            try {
+                const res = await fetch(`https://trackapi.nutritionix.com/v2/natural/nutrients`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-app-id": APP_ID,
+                        "x-app-key": APP_KEY
+                    },
+                    body: JSON.stringify({ query: food })
+                });
+                const data = await res.json();
+                if (!data.foods || data.foods.length === 0) {
+                    document.getElementById("result").innerHTML = "<p>No results found.</p>";
+                    return;
+                }
+                const foodData = data.foods[0];
+                const healthCheck = checkHealth(foodData, disease);
+                displayResult(foodData, healthCheck);
+            } catch (err) {
+                console.error(err);
+                document.getElementById("result").innerHTML = "<p>Error fetching data.</p>";
+            }
+        }
+
+        function checkHealth(food, disease) {
+            const { nf_calories, nf_total_fat, nf_sodium, nf_dietary_fiber, nf_sugars, nf_protein } = food;
+            let isHealthy = true;
+            let reasons = [];
+
+            if (disease === "liver") {
+                if (nf_total_fat > 10) { isHealthy = false; reasons.push("High fat"); }
+                if (nf_sodium > 400) { isHealthy = false; reasons.push("High sodium"); }
+                if (nf_calories > 500) { isHealthy = false; reasons.push("High calories"); }
+                if (nf_dietary_fiber < 3) { isHealthy = false; reasons.push("Low fiber (harder to digest)"); }
+            } else if (disease === "diabetes") {
+                if (nf_sugars > 10) { isHealthy = false; reasons.push("High sugar"); }
+                if ((nf_calories - nf_protein * 4) / 4 > 30) { isHealthy = false; reasons.push("High net carbs"); }
+            } else { // general
+                if (nf_calories > 800) { isHealthy = false; reasons.push("Very high calories"); }
+                if (nf_sodium > 800) { isHealthy = false; reasons.push("High sodium"); }
+                if (nf_sugars > 25) { isHealthy = false; reasons.push("Too much sugar"); }
+            }
+            return { isHealthy, reasons };
+        }
+
+        function displayResult(food, healthCheck) {
+            document.getElementById("result").innerHTML = `
+                <h3>${food.food_name}</h3>
+                <p>Calories: ${food.nf_calories}</p>
+                <p>Total Fat: ${food.nf_total_fat} g</p>
+                <p>Sodium: ${food.nf_sodium} mg</p>
+                <p>Fiber: ${food.nf_dietary_fiber} g</p>
+                <p>Sugar: ${food.nf_sugars} g</p>
+                <p>Protein: ${food.nf_protein} g</p>
+                <p class="${healthCheck.isHealthy ? "healthy" : "unhealthy"}">
+                    ${healthCheck.isHealthy ? "Healthy choice ✅" : "Unhealthy ❌"}
+                </p>
+                ${healthCheck.reasons.length > 0 ? `<p>Reasons: ${healthCheck.reasons.join(", ")}</p>` : ""}
+            `;
+        }
+    </script>
+</body>
+</html>
